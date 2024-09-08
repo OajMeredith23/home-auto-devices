@@ -5,6 +5,7 @@ from picozero import pico_temp_sensor, pico_led
 import machine
 import _thread
 import secrets
+import parse_query_strings
 
 reset_counter = 0
 
@@ -29,23 +30,6 @@ def open_socket(ip):
     print(connection)
     return connection
 
-def webpage(temperature, state):
-    #Template HTML
-    html = f"""
-            <!DOCTYPE html>
-            <html>
-            <form action="./?light=on">
-            <input type="submit" value="Light on" />
-            </form>
-            <form action="./?light=off">
-            <input type="submit" value="Light off" />
-            </form>
-            <p>LED is {state}</p>
-            <p>Temperature is {temperature}</p>
-            </body>
-            </html>
-            """
-    return str(html)
   
 def status_request(client):
     client.send("Hello from Pico")
@@ -57,10 +41,13 @@ def core0_thread():
         if(reset_counter == 1):
             counter = 0
             reset_counter = 0
-        print(counter, "Reset: ", reset_counter)
+        if counter >= 100:
+            counter = 0
+#         print(counter, "Reset: ", reset_counter)
         counter += 2
         sleep(0.5)
-        
+
+
 def serve(connection):
     #Start a web server
     state = 'OFF'
@@ -85,18 +72,28 @@ def serve(connection):
 
         if "status_request" in request:
             status_request(client)
+        
+        
+#         print("Parsed:" parsed)
+        
+        queries = parse_query_strings.qs_parse(request)
+        print("PARSE", queries)
+        
+        if "light" in queries and "brightness" in queries:
+            print("Changing light")
+            light = queries["light"]
+            brightness = queries["brightness"]
             
-        if "light" in request and '?' in request and '=' in request:
-            
-            requestValue = request.split('=')[1]
-            if requestValue == 'on':
+            if light == 'on':
                 pico_led.on()
                 reset_counter = 1
-                client.send('{"status": "on"}')
                 num += 1
-            elif requestValue =='off':
+            elif light =='off':
                 pico_led.off()
-                client.send('{"status": "off"}')
+            
+            return_json = '{"status":"' + str(light) + '",' + '"brightness":' + '"' + str(brightness) + '"' + '}'
+            print(return_json)
+            client.send(return_json)
                 
         print("num", num)
         client.close()
