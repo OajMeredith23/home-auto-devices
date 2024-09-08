@@ -3,8 +3,10 @@ import socket
 from time import sleep
 from picozero import pico_temp_sensor, pico_led
 import machine
+import _thread
 import secrets
 
+reset_counter = 0
 
 def connect():
     #Connect to WLAN
@@ -48,11 +50,23 @@ def webpage(temperature, state):
 def status_request(client):
     client.send("Hello from Pico")
     
+def core0_thread():
+    global reset_counter
+    counter = 1
+    while True:
+        if(reset_counter == 1):
+            counter = 0
+            reset_counter = 0
+        print(counter, "Reset: ", reset_counter)
+        counter += 2
+        sleep(0.5)
+        
 def serve(connection):
     #Start a web server
     state = 'OFF'
     pico_led.off()
     num = 0
+    global reset_counter
     while True:
         client = connection.accept()[0]
         client.send('HTTP/1.1 200 OK\n')
@@ -77,6 +91,7 @@ def serve(connection):
             requestValue = request.split('=')[1]
             if requestValue == 'on':
                 pico_led.on()
+                reset_counter = 1
                 client.send('{"status": "on"}')
                 num += 1
             elif requestValue =='off':
@@ -86,11 +101,14 @@ def serve(connection):
         print("num", num)
         client.close()
 
-        
+
+second_thread = _thread.start_new_thread(core0_thread, ())
+
+
 try:
     ip = connect()
     connection = open_socket(ip)
     serve(connection)
-    
+
 except KeyboardInterrupt:
     machine.reset()
