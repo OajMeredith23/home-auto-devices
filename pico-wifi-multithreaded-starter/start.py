@@ -3,11 +3,12 @@ import socket
 from time import sleep
 from picozero import pico_temp_sensor, pico_led
 import machine
+import utime
 import _thread
 import secrets
 import parse_query_strings
 
-reset_counter = 0
+count = 0
 
 def connect():
     #Connect to WLAN
@@ -35,25 +36,18 @@ def status_request(client):
     client.send("Hello from Pico")
     
 def core0_thread():
-    global reset_counter
-    counter = 1
+    global count
     while True:
-        if(reset_counter == 1):
-            counter = 0
-            reset_counter = 0
-        if counter >= 100:
-            counter = 0
-#         print(counter, "Reset: ", reset_counter)
-        counter += 2
-        sleep(0.5)
+        print(count)
+        utime.sleep(0.5)
 
 
 def serve(connection):
     #Start a web server
     state = 'OFF'
     pico_led.off()
-    num = 0
-    global reset_counter
+    
+    global count
     while True:
         client = connection.accept()[0]
         client.send('HTTP/1.1 200 OK\n')
@@ -73,29 +67,22 @@ def serve(connection):
         if "status_request" in request:
             status_request(client)
         
-        
-#         print("Parsed:" parsed)
-        
         queries = parse_query_strings.qs_parse(request)
         print("PARSE", queries)
         
-        if "light" in queries and "brightness" in queries:
-            print("Changing light")
-            light = queries["light"]
-            brightness = queries["brightness"]
-            
-            if light == 'on':
+        if "toggle" in queries and "scale" in queries:
+            print("Changing toggle")
+            toggle = queries["toggle"]
+            scale = queries["scale"]
+            count = scale
+            if toggle == 'on':
                 pico_led.on()
-                reset_counter = 1
-                num += 1
-            elif light =='off':
+            elif toggle =='off':
                 pico_led.off()
             
-            return_json = '{"status":"' + str(light) + '",' + '"brightness":' + '"' + str(brightness) + '"' + '}'
-            print(return_json)
+            return_json = '{"status":"' + str(toggle) + '",' + '"scale":' + '"' + str(scale) + '"' + '}'
             client.send(return_json)
                 
-        print("num", num)
         client.close()
 
 
